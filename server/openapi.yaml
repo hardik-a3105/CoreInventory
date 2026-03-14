@@ -1,0 +1,852 @@
+openapi: 3.0.0
+info:
+  title: CoreInventory API
+  version: 1.0.0
+  description: Comprehensive Inventory Management System API
+  contact:
+    name: CoreInventory Team
+  license:
+    name: ISC
+
+servers:
+  - url: http://localhost:5000/api
+    description: Development Server
+  - url: https://api.coreinventory.com/api
+    description: Production Server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Products
+    description: Product and category management
+  - name: Receipts
+    description: Inbound stock operations
+  - name: Deliveries
+    description: Outbound stock operations
+  - name: Transfers
+    description: Inter-warehouse transfers
+  - name: Adjustments
+    description: Manual stock adjustments
+  - name: Warehouses
+    description: Warehouse and location management
+  - name: Dashboard
+    description: Analytics and reporting
+
+paths:
+  /auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: Create new user account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+                - password
+              properties:
+                name:
+                  type: string
+                  minLength: 2
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 6
+                role:
+                  type: string
+                  enum: [STAFF, MANAGER, ADMIN]
+                  default: STAFF
+      responses:
+        '201':
+          description: Account created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+                    properties:
+                      token:
+                        type: string
+                      user:
+                        $ref: '#/components/schemas/User'
+        '400':
+          description: Email already registered or validation error
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Invalid email or password
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user profile
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /products:
+    get:
+      tags:
+        - Products
+      summary: List all products
+      security:
+        - Bearer: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+          description: Search by product name or SKU
+        - name: categoryId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by category
+        - name: lowStock
+          in: query
+          schema:
+            type: boolean
+          description: Only show low stock items
+      responses:
+        '200':
+          description: List of products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Product'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags:
+        - Products
+      summary: Create new product
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - sku
+              properties:
+                name:
+                  type: string
+                sku:
+                  type: string
+                categoryId:
+                  type: string
+                  format: uuid
+                unit:
+                  type: string
+                minStock:
+                  type: integer
+                  minimum: 0
+                initialStock:
+                  type: integer
+                  minimum: 0
+      responses:
+        '201':
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /products/{id}:
+    get:
+      tags:
+        - Products
+      summary: Get product details
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags:
+        - Products
+      summary: Update product
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                sku:
+                  type: string
+                categoryId:
+                  type: string
+                  format: uuid
+                unit:
+                  type: string
+                minStock:
+                  type: integer
+      responses:
+        '200':
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+    delete:
+      tags:
+        - Products
+      summary: Delete product
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Product deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /receipts:
+    get:
+      tags:
+        - Receipts
+      summary: List all receipts
+      security:
+        - Bearer: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, WAITING, READY, DONE, CANCELED]
+      responses:
+        '200':
+          description: List of receipts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Receipt'
+
+    post:
+      tags:
+        - Receipts
+      summary: Create new receipt
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - supplier
+                - lines
+              properties:
+                supplier:
+                  type: string
+                notes:
+                  type: string
+                lines:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - productId
+                      - quantity
+                    properties:
+                      productId:
+                        type: string
+                        format: uuid
+                      quantity:
+                        type: integer
+                        minimum: 1
+      responses:
+        '201':
+          description: Receipt created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /receipts/{id}:
+    get:
+      tags:
+        - Receipts
+      summary: Get receipt details
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Receipt details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /receipts/{id}/validate:
+    post:
+      tags:
+        - Receipts
+      summary: Validate receipt and update stock
+      security:
+        - Bearer: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Receipt validated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /deliveries:
+    get:
+      tags:
+        - Deliveries
+      summary: List all deliveries
+      security:
+        - Bearer: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, WAITING, READY, DONE, CANCELED]
+      responses:
+        '200':
+          description: List of deliveries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Delivery'
+
+    post:
+      tags:
+        - Deliveries
+      summary: Create new delivery order
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customer
+                - lines
+              properties:
+                customer:
+                  type: string
+                notes:
+                  type: string
+                lines:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - productId
+                      - quantity
+                    properties:
+                      productId:
+                        type: string
+                        format: uuid
+                      quantity:
+                        type: integer
+                        minimum: 1
+      responses:
+        '201':
+          description: Delivery created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+  /transfers:
+    get:
+      tags:
+        - Transfers
+      summary: List all transfers
+      security:
+        - Bearer: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [DRAFT, WAITING, READY, DONE, CANCELED]
+      responses:
+        '200':
+          description: List of transfers
+
+    post:
+      tags:
+        - Transfers
+      summary: Create new transfer
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - fromLocation
+                - toLocation
+                - lines
+              properties:
+                fromLocation:
+                  type: string
+                  format: uuid
+                toLocation:
+                  type: string
+                  format: uuid
+                notes:
+                  type: string
+                lines:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required:
+                      - productId
+                      - quantity
+                    properties:
+                      productId:
+                        type: string
+                        format: uuid
+                      quantity:
+                        type: integer
+                        minimum: 1
+      responses:
+        '201':
+          description: Transfer created
+
+  /adjustments:
+    get:
+      tags:
+        - Adjustments
+      summary: List all adjustments
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: List of adjustments
+
+    post:
+      tags:
+        - Adjustments
+      summary: Create manual adjustment
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - productId
+                - newQty
+              properties:
+                productId:
+                  type: string
+                  format: uuid
+                newQty:
+                  type: integer
+                  minimum: 0
+                locationId:
+                  type: string
+                  format: uuid
+                reason:
+                  type: string
+      responses:
+        '201':
+          description: Adjustment created
+
+  /warehouses:
+    get:
+      tags:
+        - Warehouses
+      summary: List all warehouses
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: List of warehouses
+
+    post:
+      tags:
+        - Warehouses
+      summary: Create warehouse (Manager only)
+      security:
+        - Bearer: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                address:
+                  type: string
+      responses:
+        '201':
+          description: Warehouse created
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /dashboard:
+    get:
+      tags:
+        - Dashboard
+      summary: Get dashboard analytics
+      security:
+        - Bearer: []
+      responses:
+        '200':
+          description: Dashboard data with KPIs and recent activity
+
+  /dashboard/move-history:
+    get:
+      tags:
+        - Dashboard
+      summary: Get stock movement history
+      security:
+        - Bearer: []
+      parameters:
+        - name: productId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [RECEIPT, DELIVERY, TRANSFER_OUT, TRANSFER_IN, ADJUSTMENT]
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Stock movement history
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [STAFF, MANAGER, ADMIN]
+        createdAt:
+          type: string
+          format: date-time
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        sku:
+          type: string
+        unit:
+          type: string
+        minStock:
+          type: integer
+        totalStock:
+          type: integer
+        categoryId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Receipt:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+        supplier:
+          type: string
+        notes:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, WAITING, READY, DONE, CANCELED]
+        lines:
+          type: array
+          items:
+            type: object
+        createdAt:
+          type: string
+          format: date-time
+
+    Delivery:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        reference:
+          type: string
+        customer:
+          type: string
+        notes:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, WAITING, READY, DONE, CANCELED]
+        lines:
+          type: array
+          items:
+            type: object
+        createdAt:
+          type: string
+          format: date-time
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Success
+        data:
+          type: object
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+              message:
+                type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+            user:
+              $ref: '#/components/schemas/User'
+
+  securitySchemes:
+    Bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token in the format of Bearer <token>
+
+  responses:
+    Unauthorized:
+      description: Authentication token is invalid or missing
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+    ValidationError:
+      description: Request validation failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+security:
+  - Bearer: []
