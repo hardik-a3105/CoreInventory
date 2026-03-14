@@ -1,29 +1,28 @@
-import prisma from '../utils/prisma.js'
+import OTP from '../models/OTP.js'
 import { generateOtp, otpExpiresAt } from '../utils/generateOtp.js'
 import { sendOtpEmail } from '../utils/mailer.js'
 
 export const createAndSendOtp = async (user) => {
   const code = generateOtp()
 
-  await prisma.otp.updateMany({
-    where: { userId: user.id, used: false },
-    data: { used: true },
-  })
+  // Mark previous OTPs as expired for this user
+  await OTP.deleteMany({ userId: user._id })
 
-  await prisma.otp.create({
-    data: { userId: user.id, code, expiresAt: otpExpiresAt() },
-  })
+  await OTP.create({ userId: user._id, code, expiresAt: otpExpiresAt() })
 
   await sendOtpEmail(user.email, code)
   return code
 }
 
 export const verifyOtp = async (userId, code) => {
-  const otp = await prisma.otp.findFirst({
-    where: { userId, code, used: false, expiresAt: { gt: new Date() } },
+  const otp = await OTP.findOne({
+    userId,
+    code,
+    expiresAt: { $gt: new Date() },
   })
   if (!otp) return false
 
-  await prisma.otp.update({ where: { id: otp.id }, data: { used: true } })
+  // Delete the OTP after verification
+  await OTP.deleteOne({ _id: otp._id })
   return true
 }

@@ -32,7 +32,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`📨 ${req.method} ${req.path}`)
+  const method = req.method.padEnd(6)
+  const path = req.path.padEnd(30)
+  console.log(`  ${method} ${path} ← ${req.ip}`)
   next()
 })
 

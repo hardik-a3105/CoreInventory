@@ -1,36 +1,31 @@
 import app from './app.js'
-
-// Lazy load Prisma to avoid initialization issues
-let prisma = null
-
-const initPrisma = async () => {
-  if (!prisma) {
-    const { default: prismaClient } = await import('./src/utils/prisma.js')
-    prisma = prismaClient
-  }
-  return prisma
-}
+import { connectDB, disconnectDB } from './src/utils/prisma.js'
 
 const PORT = process.env.PORT || 5000
 const NODE_ENV = process.env.NODE_ENV || 'development'
 
 // Start server
 const server = app.listen(PORT, () => {
+  console.clear()
   console.log(`
-╔════════════════════════════════════════╗
-║   CoreInventory API Server              ║
-║   Environment: ${NODE_ENV.padEnd(24)}║
-║   Port: ${PORT.toString().padEnd(28)}║
-║   Running at: http://localhost:${PORT}  ${' '.repeat(Math.max(0, 13 - PORT.toString().length))}║
-╚════════════════════════════════════════╝
+╔════════════════════════════════════════════════════════╗
+║                                                        ║
+║            🏭 CoreInventory API Server 🏭             ║
+║                                                        ║
+║  Environment: ${NODE_ENV.toUpperCase().padEnd(36)}║
+║  Port: ${PORT.toString().padEnd(44)}║
+║  URL: http://localhost:${PORT}${' '.repeat(Math.max(0, 32 - PORT.toString().length))}║
+║  Status: ✅ Running                                   ║
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
   `)
   
-  // Initialize Prisma in background
-  initPrisma().then(() => {
-    console.log('✅ Database connected')
+  // Initialize MongoDB connection
+  connectDB().then(() => {
+    console.log('✅ MongoDB connected successfully\n')
   }).catch(err => {
-    console.error('⚠️  Database connection issue:', err.message)
-    console.log('ℹ️  API server is still running without database')
+    console.log('⚠️  MongoDB connection failed:', err.message)
+    console.log('ℹ️  Using mock database for offline development\n')
   })
 })
 
@@ -38,9 +33,7 @@ const server = app.listen(PORT, () => {
 process.on('SIGINT', async () => {
   console.log('\n\n🛑 Shutting down gracefully...')
   server.close(async () => {
-    if (prisma) {
-      await prisma.$disconnect()
-    }
+    await disconnectDB()
     console.log('✅ Server and database connections closed')
     process.exit(0)
   })
