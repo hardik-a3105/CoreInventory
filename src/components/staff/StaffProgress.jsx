@@ -2,9 +2,13 @@ import { useInventoryStore } from '../../store/inventoryStore'
 
 export default function StaffProgress() {
   const { staffTasks } = useInventoryStore()
-  const total = staffTasks.pickList.length + staffTasks.transfers.length + staffTasks.shelving.length + staffTasks.counting.length
-  const done  = staffTasks.pickList.filter(p => p.status === 'done').length
-  const pct   = Math.round((done / total) * 100)
+  const pickList = staffTasks?.pickList || []
+  const transfers = staffTasks?.transfers || []
+  const shelving = staffTasks?.shelving || []
+  
+  const total = pickList.length + transfers.length + shelving.length
+  const done  = pickList.filter(p => p.status === 'COMPLETED').length + transfers.filter(p => p.status === 'COMPLETED').length + shelving.filter(s => s.status === 'COMPLETED').length
+  const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
 
   return (
     <div className="card px-6 py-5 flex items-center gap-8">

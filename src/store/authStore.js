@@ -5,11 +5,12 @@ export const useAuthStore = create(
   persist(
     (set) => ({
       user: null,
+      token: null,
       role: null,
       isAuthenticated: false,
-      login: (u) => set({ user: u, role: u.role, isAuthenticated: true }),
+      login: (user, token) => set({ user, token, role: user.role, isAuthenticated: true }),
       setRole: (r) => set({ role: r }),
-      logout: () => set({ user: null, role: null, isAuthenticated: false }),
+      logout: () => set({ user: null, token: null, role: null, isAuthenticated: false }),
     }),
     { name: 'ci-auth' }
   )

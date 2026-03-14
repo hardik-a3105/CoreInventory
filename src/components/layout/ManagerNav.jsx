@@ -3,7 +3,7 @@ import { useAuthStore } from '../../store/authStore'
 
 const NAV = ['Dashboard','Products','Receipts','Deliveries','Transfers','Adjustments']
 
-export default function ManagerNav({ active, onTabChange }) {
+export default function ManagerNav({ active, onTabChange, onNewOperation }) {
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const initials = user?.name?.split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2) || 'JD'
@@ -17,7 +17,7 @@ export default function ManagerNav({ active, onTabChange }) {
 
       {/* Nav links */}
       <div className="flex items-center gap-1 flex-1">
-        {NAV.map((n) => (
+        {[...NAV, ...(user?.role === 'ADMIN' ? ['Users'] : [])].map((n) => (
           <button
             key={n}
             onClick={() => onTabChange?.(n)}
@@ -50,7 +50,10 @@ export default function ManagerNav({ active, onTabChange }) {
           <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center font-bold">5</span>
         </div>
 
-        <button className="bg-primary text-white text-sm font-semibold px-4 py-2 rounded-xl border-none cursor-pointer hover:bg-primary-dark transition-colors">
+        <button 
+          onClick={onNewOperation}
+          className="bg-primary text-white text-sm font-semibold px-4 py-2 rounded-xl border-none cursor-pointer hover:bg-primary-dark transition-colors"
+        >
           + New Operation
         </button>
 

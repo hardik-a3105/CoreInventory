@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
+import { api } from '../lib/axios'
 import Blobs from '../components/ui/Blobs'
 
 const ROLES = [
@@ -39,7 +40,7 @@ export default function SignupPage() {
   const { login } = useAuthStore()
   const navigate  = useNavigate()
 
-  const handle = (e) => {
+  const handle = async (e) => {
     e.preventDefault()
     setError('')
     if (!form.name || !form.email || !form.password) { setError('Please fill in all fields.'); return }
@@ -47,11 +48,28 @@ export default function SignupPage() {
     if (form.password.length < 6) { setError('Password must be at least 6 characters.'); return }
     if (!form.role) { setError('Please select your role.'); return }
     setLoading(true)
-    setTimeout(() => {
+    
+    try {
+      const backendRole = form.role === 'manager' ? 'MANAGER' : 'STAFF';
+      await api.post('/auth/register', {
+        name: form.name,
+        email: form.email,
+        password: form.password,
+        role: backendRole
+      })
+      
+      const { data } = await api.post('/auth/login', {
+        email: form.email,
+        password: form.password,
+      })
+      
+      login(data.user, data.token)
+      navigate(data.user.role.toLowerCase() === 'manager' ? '/manager' : '/staff')
+    } catch (err) {
+      setError(err.response?.data?.error || 'Registration failed. Please try again.')
+    } finally {
       setLoading(false)
-      login({ name: form.name, email: form.email, token: 'mock-token', role: form.role })
-      navigate(form.role === 'manager' ? '/manager' : '/staff')
-    }, 800)
+    }
   }
 
   const FIELDS = [

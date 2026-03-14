@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Blobs from '../components/ui/Blobs'
+import { api } from '../lib/axios'
 
 const STEPS = [
   { title: 'Reset your password', sub: 'Enter the email linked to your account' },
@@ -20,17 +21,20 @@ export default function ForgotPasswordPage() {
   const navigate = useNavigate()
 
   /* -------- Step 0: Send OTP -------- */
-  const handleSendOtp = (e) => {
+  const handleSendOtp = async (e) => {
     e.preventDefault()
     setError('')
     if (!email) { setError('Please enter your email address.'); return }
     if (!/\S+@\S+\.\S+/.test(email)) { setError('Please enter a valid email.'); return }
     setLoading(true)
-    // Mock: pretend OTP was sent
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      await api.post('/auth/forgot-password', { email })
       setStep(1)
-    }, 800)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to send OTP')
+    } finally {
+      setLoading(false)
+    }
   }
 
   /* -------- Step 1: Verify OTP -------- */
@@ -53,31 +57,38 @@ export default function ForgotPasswordPage() {
     }
   }
 
-  const handleVerifyOtp = (e) => {
+  const handleVerifyOtp = async (e) => {
     e.preventDefault()
     setError('')
     const code = otp.join('')
     if (code.length < 6) { setError('Please enter the full 6-digit code.'); return }
     setLoading(true)
-    // Mock verification — accept any 6 digits
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      await api.post('/auth/verify-otp', { email, otp: code })
       setStep(2)
-    }, 800)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Invalid OTP')
+    } finally {
+      setLoading(false)
+    }
   }
 
   /* -------- Step 2: Set New Password -------- */
-  const handleReset = (e) => {
+  const handleReset = async (e) => {
     e.preventDefault()
     setError('')
     if (!password || !confirm) { setError('Please fill in both fields.'); return }
     if (password.length < 6) { setError('Password must be at least 6 characters.'); return }
     if (password !== confirm) { setError('Passwords do not match.'); return }
     setLoading(true)
-    setTimeout(() => {
-      setLoading(false)
+    try {
+      await api.post('/auth/reset-password', { email, otp: otp.join(''), password })
       setSuccess(true)
-    }, 800)
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to reset password')
+    } finally {
+      setLoading(false)
+    }
   }
 
   /* -------- Progress indicator -------- */

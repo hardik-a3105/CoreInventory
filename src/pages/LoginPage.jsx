@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
+import { api } from '../lib/axios'
 import Blobs from '../components/ui/Blobs'
 
 export default function LoginPage() {
@@ -10,18 +11,24 @@ export default function LoginPage() {
   const { login } = useAuthStore()
   const navigate  = useNavigate()
 
-  const handle = (e) => {
+  const handle = async (e) => {
     e.preventDefault()
     setError('')
     if (!form.email || !form.password) { setError('Please fill in all fields.'); return }
     setLoading(true)
-    // Mock login — in production, the backend returns the user's saved role
-    setTimeout(() => {
+    
+    try {
+      const { data } = await api.post('/auth/login', {
+        email: form.email,
+        password: form.password,
+      })
+      login(data.user, data.token)
+      navigate(data.user.role.toLowerCase() === 'manager' ? '/manager' : '/staff')
+    } catch (err) {
+      setError(err.response?.data?.error || 'Login failed. Please try again.')
+    } finally {
       setLoading(false)
-      const mockRole = 'manager' // role comes from backend in real implementation
-      login({ name: 'Jay D.', email: form.email, token: 'mock-token', role: mockRole })
-      navigate(mockRole === 'manager' ? '/manager' : '/staff')
-    }, 800)
+    }
   }
 
   return (

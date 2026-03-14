@@ -1,11 +1,31 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useInventoryStore } from '../../store/inventoryStore'
+import { api } from '../../lib/axios'
 import Badge from '../ui/Badge'
 
-export default function AdjustmentsTab() {
-  const { adjustments, alerts } = useInventoryStore()
+export default function AdjustmentsTab({ onNew }) {
+  const { alerts } = useInventoryStore()
   const [filter, setFilter] = useState('all')
-  const filtered = filter === 'all' ? adjustments : adjustments.filter(a => a.status === filter)
+  const [adjustments, setAdjustments] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchAdjustments = async () => {
+      try {
+        const { data } = await api.get('/operations?type=ADJUSTMENT')
+        setAdjustments(data.operations || [])
+      } catch (err) {
+        console.error('Failed to fetch adjustments', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchAdjustments()
+  }, [])
+
+  const filtered = Array.isArray(adjustments) 
+    ? (filter === 'all' ? adjustments : adjustments.filter(a => a.status?.toLowerCase() === filter))
+    : [];
 
   return (
     <div className="flex flex-col gap-5">
@@ -14,12 +34,15 @@ export default function AdjustmentsTab() {
           <h2 className="text-xl font-bold text-navy">Stock Adjustments</h2>
           <p className="text-sm text-muted mt-1">Fix mismatches between system records and physical counts.</p>
         </div>
-        <button className="bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl border-none cursor-pointer hover:bg-primary-dark transition-colors">
+        <button 
+          onClick={onNew}
+          className="bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl border-none cursor-pointer hover:bg-primary-dark transition-colors"
+        >
           + New Adjustment
         </button>
       </div>
 
-      {/* Alert summary */}
+      {/* Alert summary - currently still mocked from store! */}
       <div className="card p-5 border-l-4 border-red-400">
         <div className="text-sm font-bold text-red-700 mb-3">Items requiring attention ({alerts.length})</div>
         <div className="grid grid-cols-2 gap-3">
@@ -54,16 +77,25 @@ export default function AdjustmentsTab() {
         <div className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr_1fr] px-6 py-3 bg-gray-50 text-xs font-semibold text-muted uppercase tracking-wide border-b border-gray-100">
           <span>ID</span><span>Product</span><span>Location</span><span>Reason</span><span>Qty Change</span><span>Status</span>
         </div>
-        {filtered.map((a) => (
-          <div key={a.id} className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr_1fr] px-6 py-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer last:border-0 items-center">
-            <span className="text-sm font-mono font-medium text-primary">{a.id}</span>
-            <span className="text-sm font-medium text-navy">{a.product}</span>
-            <span className="text-sm text-muted">{a.location}</span>
-            <span className="text-sm text-navy">{a.reason}</span>
-            <span className={`text-sm font-semibold ${a.qty.startsWith('+') ? 'text-green-700' : 'text-red-600'}`}>{a.qty}</span>
-            <Badge status={a.status} />
-          </div>
-        ))}
+        
+        {loading ? (
+          <div className="px-6 py-12 text-center text-muted text-sm">Loading adjustments...</div>
+        ) : filtered.length === 0 ? (
+          <div className="px-6 py-12 text-center text-muted text-sm">No adjustments found.</div>
+        ) : (
+          filtered.map((a) => (
+            <div key={a.id} className="grid grid-cols-[1fr_2fr_1.5fr_2fr_1fr_1fr] px-6 py-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer last:border-0 items-center">
+              <span className="text-sm font-mono font-medium text-primary">ADJ-{a.id.substring(0,6)}</span>
+              <span className="text-sm font-medium text-navy">{a.product?.name}</span>
+              <span className="text-sm text-muted">{a.warehouse?.name || 'N/A'}</span>
+              <span className="text-sm text-navy">{a.notes || 'No reason provided'}</span>
+              <span className={`text-sm font-semibold ${a.quantity > 0 ? 'text-green-700' : 'text-red-600'}`}>
+                {a.quantity > 0 ? `+${a.quantity}` : a.quantity} {a.unit}
+              </span>
+              <Badge status={a.status.toLowerCase()} />
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

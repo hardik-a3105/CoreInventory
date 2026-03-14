@@ -1,24 +1,30 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { api } from '../../lib/axios'
 import Badge from '../ui/Badge'
 
-const PRODUCTS = [
-  { id:'SKU-0041', name:'Steel Rods 12mm',    category:'Metals',    unit:'kg',  stock:320,  min:50,  location:'Rack A3', status:'done'  },
-  { id:'SKU-0089', name:'Copper Wire 2.5mm',  category:'Electrical',unit:'m',   stock:0,    min:100, location:'Rack C4', status:'draft' },
-  { id:'SKU-0112', name:'Aluminum Sheets',    category:'Metals',    unit:'kg',  stock:180,  min:30,  location:'Rack B1', status:'done'  },
-  { id:'SKU-0205', name:'Office Chairs',      category:'Furniture', unit:'pcs', stock:94,   min:10,  location:'Rack D2', status:'done'  },
-  { id:'SKU-0318', name:'M8 Bolts',           category:'Hardware',  unit:'pcs', stock:120,  min:200, location:'Rack F3', status:'ready' },
-  { id:'SKU-0402', name:'PVC Pipe 20mm',      category:'Plumbing',  unit:'pcs', stock:18,   min:40,  location:'Rack E1', status:'ready' },
-  { id:'SKU-0500', name:'Steel Rod 8mm',      category:'Metals',    unit:'kg',  stock:3,    min:50,  location:'Rack A5', status:'draft' },
-  { id:'SKU-0611', name:'Copper Cable 2.5mm', category:'Electrical',unit:'m',   stock:0,    min:80,  location:'Rack C5', status:'draft' },
-]
-
-export default function ProductsTab() {
+export default function ProductsTab({ onAdd }) {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('all')
+  const [products, setProducts] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const categories = ['all', ...new Set(PRODUCTS.map(p => p.category))]
-  const filtered = PRODUCTS.filter(p => {
-    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.id.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const { data } = await api.get('/products')
+        setProducts(data.products || [])
+      } catch (err) {
+        console.error('Failed to fetch products', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchProducts()
+  }, [])
+
+  const categories = ['all', ...new Set(products.map(p => p.category).filter(Boolean))]
+  const filtered = products.filter(p => {
+    const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase())
     const matchCat = category === 'all' || p.category === category
     return matchSearch && matchCat
   })
@@ -36,7 +42,10 @@ export default function ProductsTab() {
           <h2 className="text-xl font-bold text-navy">Products</h2>
           <p className="text-sm text-muted mt-1">Manage your product catalog, stock levels, and reorder rules.</p>
         </div>
-        <button className="bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl border-none cursor-pointer hover:bg-primary-dark transition-colors">
+        <button 
+          onClick={onAdd}
+          className="bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl border-none cursor-pointer hover:bg-primary-dark transition-colors"
+        >
           + Add Product
         </button>
       </div>
@@ -71,27 +80,34 @@ export default function ProductsTab() {
         <div className="grid grid-cols-[1fr_2fr_1fr_1fr_1fr_1fr_1fr] px-6 py-3 bg-gray-50 text-xs font-semibold text-muted uppercase tracking-wide border-b border-gray-100">
           <span>SKU</span><span>Product Name</span><span>Category</span><span>Unit</span><span>Current Stock</span><span>Location</span><span>Stock Status</span>
         </div>
-        {filtered.map((p) => {
-          const ss = getStockStatus(p.stock, p.min)
-          return (
-            <div key={p.id} className="grid grid-cols-[1fr_2fr_1fr_1fr_1fr_1fr_1fr] px-6 py-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer last:border-0 items-center">
-              <span className="text-sm font-mono font-medium text-primary">{p.id}</span>
-              <span className="text-sm font-semibold text-navy">{p.name}</span>
-              <span className="text-sm text-muted">{p.category}</span>
-              <span className="text-sm text-muted">{p.unit}</span>
-              <div>
-                <span className={`text-sm font-bold ${p.stock === 0 ? 'text-red-600' : p.stock < p.min ? 'text-amber-600' : 'text-green-700'}`}>
-                  {p.stock} {p.unit}
-                </span>
-                <div className="text-xs text-muted">Min: {p.min}</div>
-              </div>
-              <span className="text-sm text-muted">{p.location}</span>
-              <span className={`inline-block text-xs font-semibold px-3 py-1 rounded-lg ${ss.cls}`}>{ss.label}</span>
-            </div>
-          )
-        })}
-        {filtered.length === 0 && (
+        
+        {loading ? (
+          <div className="px-6 py-12 text-center text-muted text-sm">Loading products...</div>
+        ) : filtered.length === 0 ? (
           <div className="px-6 py-12 text-center text-muted text-sm">No products match your search.</div>
+        ) : (
+          filtered.map((p) => {
+            const currentStock = p.stockLevels?.reduce((sum, level) => sum + level.quantity, 0) || 0;
+            const location = p.stockLevels?.[0]?.warehouse?.name || 'N/A';
+            const ss = getStockStatus(currentStock, p.minStock);
+
+            return (
+              <div key={p.id} className="grid grid-cols-[1fr_2fr_1fr_1fr_1fr_1fr_1fr] px-6 py-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer last:border-0 items-center">
+                <span className="text-sm font-mono font-medium text-primary">{p.sku}</span>
+                <span className="text-sm font-semibold text-navy">{p.name}</span>
+                <span className="text-sm text-muted">{p.category || '—'}</span>
+                <span className="text-sm text-muted">{p.unit}</span>
+                <div>
+                  <span className={`text-sm font-bold ${currentStock <= 0 ? 'text-red-600' : currentStock < p.minStock ? 'text-amber-600' : 'text-green-700'}`}>
+                    {Math.max(0, currentStock)} {p.unit}
+                  </span>
+                  <div className="text-xs text-muted">Min: {p.minStock}</div>
+                </div>
+                <span className="text-sm text-muted">{location}</span>
+                <span className={`inline-block text-xs font-semibold px-3 py-1 rounded-lg ${ss.cls}`}>{ss.label}</span>
+              </div>
+            )
+          })
         )}
       </div>
     </div>

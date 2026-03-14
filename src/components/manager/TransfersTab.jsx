@@ -1,11 +1,27 @@
-import { useState } from 'react'
-import { useInventoryStore } from '../../store/inventoryStore'
+import { useState, useEffect } from 'react'
+import { api } from '../../lib/axios'
 import Badge from '../ui/Badge'
 
-export default function TransfersTab() {
-  const { transfers } = useInventoryStore()
+export default function TransfersTab({ onCreate }) {
   const [filter, setFilter] = useState('all')
-  const filtered = filter === 'all' ? transfers : transfers.filter(t => t.status === filter)
+  const [transfers, setTransfers] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchTransfers = async () => {
+      try {
+        const { data } = await api.get('/operations?type=TRANSFER')
+        setTransfers(data.operations || [])
+      } catch (err) {
+        console.error('Failed to fetch transfers', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchTransfers()
+  }, [])
+
+  const filtered = filter === 'all' ? transfers : transfers.filter(t => t.status.toLowerCase() === filter)
 
   return (
     <div className="flex flex-col gap-5">
@@ -14,7 +30,10 @@ export default function TransfersTab() {
           <h2 className="text-xl font-bold text-navy">Internal Transfers</h2>
           <p className="text-sm text-muted mt-1">Move stock between warehouses, floors, and racks. All movements are logged.</p>
         </div>
-        <button className="bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl border-none cursor-pointer hover:bg-primary-dark transition-colors">
+        <button 
+          onClick={onCreate}
+          className="bg-primary text-white text-sm font-semibold px-5 py-2.5 rounded-xl border-none cursor-pointer hover:bg-primary-dark transition-colors"
+        >
           + Create Transfer
         </button>
       </div>
@@ -34,16 +53,23 @@ export default function TransfersTab() {
         <div className="grid grid-cols-[1fr_1.5fr_1.5fr_2fr_1fr_1fr] px-6 py-3 bg-gray-50 text-xs font-semibold text-muted uppercase tracking-wide border-b border-gray-100">
           <span>Transfer ID</span><span>From</span><span>To</span><span>Product</span><span>Qty</span><span>Status</span>
         </div>
-        {filtered.map((t) => (
-          <div key={t.id} className="grid grid-cols-[1fr_1.5fr_1.5fr_2fr_1fr_1fr] px-6 py-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer last:border-0 items-center">
-            <span className="text-sm font-mono font-medium text-primary">{t.id}</span>
-            <span className="text-sm font-medium text-navy">{t.from}</span>
-            <span className="text-sm font-medium text-navy">{t.to}</span>
-            <span className="text-sm text-navy">{t.product}</span>
-            <span className="text-sm font-semibold text-blue-700">{t.qty}</span>
-            <Badge status={t.status} />
-          </div>
-        ))}
+        
+        {loading ? (
+          <div className="px-6 py-12 text-center text-muted text-sm">Loading transfers...</div>
+        ) : filtered.length === 0 ? (
+          <div className="px-6 py-12 text-center text-muted text-sm">No transfers found.</div>
+        ) : (
+          filtered.map((t) => (
+            <div key={t.id} className="grid grid-cols-[1fr_1.5fr_1.5fr_2fr_1fr_1fr] px-6 py-4 border-b border-gray-50 hover:bg-gray-50 cursor-pointer last:border-0 items-center">
+              <span className="text-sm font-mono font-medium text-primary">TRN-{t.id.substring(0,6)}</span>
+              <span className="text-sm font-medium text-navy">{t.warehouse?.name || 'Main'}</span>
+              <span className="text-sm font-medium text-navy">{t.reference || 'Destination'}</span>
+              <span className="text-sm text-navy">{t.product?.name}</span>
+              <span className="text-sm font-semibold text-blue-700">{t.quantity} {t.unit}</span>
+              <Badge status={t.status.toLowerCase()} />
+            </div>
+          ))
+        )}
         {filtered.length === 0 && (
           <div className="px-6 py-12 text-center text-muted text-sm">No transfers found.</div>
         )}

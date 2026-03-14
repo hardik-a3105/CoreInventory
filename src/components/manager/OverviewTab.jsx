@@ -2,18 +2,18 @@ import { useInventoryStore } from '../../store/inventoryStore'
 import Badge from '../ui/Badge'
 
 const KPI_CONFIG = [
-  { key:'totalProducts',    label:'Total Products in Stock', sub:'Items currently available',   color:'#6D28D9', bg:'#EDE9FF', trend:'+24 this week' },
-  { key:'lowStock',         label:'Need Restocking',         sub:'12 out of stock, 25 low',     color:'#DC2626', bg:'#FEF2F2', trend:'Action required' },
-  { key:'pendingReceipts',  label:'Goods Arriving',          sub:'Waiting to be received',      color:'#D97706', bg:'#FFFBEB', trend:'3 need validation' },
-  { key:'pendingDeliveries',label:'Orders to Ship',          sub:'Ready to dispatch today',     color:'#2563EB', bg:'#EFF6FF', trend:'6 due today' },
-  { key:'transfersToday',   label:'Stock Moves Today',       sub:'Transfers between locations', color:'#059669', bg:'#ECFDF5', trend:'On track' },
+  { key:'totalProducts',    label:'Total Products in Stock', sub:'Items currently available',   color:'#6D28D9', bg:'#EDE9FF', trend:'Updated' },
+  { key:'lowStock',         label:'Need Restocking',         sub:'Items below min stock',       color:'#DC2626', bg:'#FEF2F2', trend:'Action' },
+  { key:'pendingReceipts',  label:'Goods Arriving',          sub:'Waiting to be received',      color:'#D97706', bg:'#FFFBEB', trend:'Pending' },
+  { key:'pendingDeliveries',label:'Orders to Ship',          sub:'Ready to dispatch',           color:'#2563EB', bg:'#EFF6FF', trend:'Due' },
+  { key:'transfersToday',   label:'Stock Moves Today',       sub:'Transfers today',             color:'#059669', bg:'#ECFDF5', trend:'Done' },
 ]
 
 const typeMap = {
-  receipt:    { label:'Receipt',    dot:'#059669' },
-  delivery:   { label:'Delivery',   dot:'#2563EB' },
-  transfer:   { label:'Transfer',   dot:'#D97706' },
-  adjustment: { label:'Adjustment', dot:'#6D28D9' },
+  RECEIPT:    { label:'Receipt',    dot:'#059669' },
+  DELIVERY:   { label:'Delivery',   dot:'#2563EB' },
+  TRANSFER:   { label:'Transfer',   dot:'#D97706' },
+  ADJUSTMENT: { label:'Adjustment', dot:'#6D28D9' },
 }
 
 export default function OverviewTab() {
@@ -35,7 +35,7 @@ export default function OverviewTab() {
               </span>
             </div>
             <div className="text-4xl font-bold mt-1" style={{ color: c.color }}>
-              {kpis[c.key].toLocaleString()}
+              {Math.max(0, kpis?.[c.key] || 0).toLocaleString()}
             </div>
             <div className="text-sm font-semibold text-navy mt-1">{c.label}</div>
             <div className="text-xs text-muted mt-1">{c.sub}</div>
@@ -57,7 +57,7 @@ export default function OverviewTab() {
             <span>Document / Product</span><span>Type</span><span>Qty</span><span>Location</span><span>Status</span>
           </div>
           {operations.slice(0,6).map((op) => {
-            const t = typeMap[op.type]
+            const t = typeMap[op.type] || { label: op.type, dot: '#94a3b8' }
             return (
               <div key={op.id} className="grid grid-cols-[2fr_1fr_1fr_1fr_1fr] px-6 py-4 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer last:border-0 items-center">
                 <div>
@@ -68,7 +68,7 @@ export default function OverviewTab() {
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.dot }} />
                   <span className="text-sm text-muted">{t.label}</span>
                 </div>
-                <span className={`text-sm font-semibold ${op.qty.startsWith('+') ? 'text-green-700' : op.qty.startsWith('−') ? 'text-red-600' : 'text-blue-700'}`}>
+                <span className={`text-sm font-semibold ${op.qty?.startsWith('+') ? 'text-green-700' : op.qty?.startsWith('−') ? 'text-red-600' : 'text-blue-700'}`}>
                   {op.qty}
                 </span>
                 <span className="text-sm text-muted">{op.location}</span>

@@ -10,7 +10,13 @@ import StaffDashboard from './pages/StaffDashboard'
 function Guard({ children, role }) {
   const { isAuthenticated, role: userRole } = useAuthStore()
   if (!isAuthenticated) return <Navigate to="/login" replace />
-  if (role && userRole !== role) return <Navigate to={userRole === 'manager' ? '/manager' : '/staff'} replace />
+  
+  const normalizedUserRole = userRole?.toLowerCase()
+  const normalizedRequiredRole = role?.toLowerCase()
+
+  if (normalizedRequiredRole && normalizedUserRole !== normalizedRequiredRole) {
+    return <Navigate to={normalizedUserRole === 'manager' ? '/manager' : '/staff'} replace />
+  }
   return children
 }
 
